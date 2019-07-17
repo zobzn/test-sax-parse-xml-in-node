@@ -1,30 +1,33 @@
-const fs = require("fs");
-const sax = require("sax");
-const flow = require("xml-flow");
+const fs = require('fs');
+const flow = require('xml-flow');
 
-console.time("test");
+async function readXml(filename, selectors) {
+    return new Promise((resolve, reject) => {
+        const strStream = fs.createReadStream(filename, { encoding: 'utf8' });
+        const xmlStream = flow(strStream, { strict: true });
 
-const xmlFileName = "aspo.xml" || "alfabroc.xml";
+        let isReading = true;
 
-const strStream = fs.createReadStream(xmlFileName);
-const xmlStream = flow(strStream, { strict: true });
-const ids = [];
+        Object.entries(selectors).forEach(([selector, callback]) => {
+            xmlStream.on(selector, element => {
+                isReading = isReading && (callback(element) !== false);
+            });
+        });
 
-xmlStream.on("tag:offer", offer => {
-  // console.log(offer["$attrs"]);
-  process.stdout.write(".");
-  ids.push(offer["$attrs"]["internal-id"]);
+        strStream.on('open', () => {});
+        strStream.on('end', resolve);
+        strStream.on('error', resolve);
+    });
+}
 
-  if (false && ids.length > 100) {
-    strStream.destroy();
-  }
-});
+(async () => {
+    const persons = [];
 
-strStream.on("end", () => {
-  process.stdout.write("\n");
-  // process.stdout.write(ids.join("\n"));
-  process.stdout.write(`total: ${ids.length}`);
-  process.stdout.write("\n");
-  // console.log(ids);
-  console.timeEnd("test");
-});
+    await readXml('persons.xml', {
+        'tag:person': person => {
+            persons.push(person);
+        },
+    });
+
+    console.log(persons);
+})();
